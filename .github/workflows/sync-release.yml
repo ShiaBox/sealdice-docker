@@ -136,9 +136,8 @@ jobs:
       - name: 更新记录并触发构建
         if: env.PRE_NEED_UPDATE == 'true' || env.STABLE_NEED_UPDATE == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          # 提交版本信息更新
           git config user.name "github-actions"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
@@ -151,13 +150,12 @@ jobs:
           fi
           
           git commit -m "更新SealDice版本信息"
-          git push
+          git push "https://${{ github.actor }}:$GITHUB_TOKEN@github.com/${{ github.repository }}.git"
           
-          # 只触发构建工作流，不传递参数
+          # 触发构建工作流
           curl -X POST \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            -H "Content-Type: application/json" \
             "https://api.github.com/repos/${{ github.repository }}/dispatches" \
             -d '{
               "event_type": "build-sealdice"
