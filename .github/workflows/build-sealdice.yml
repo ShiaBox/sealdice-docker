@@ -98,6 +98,9 @@ jobs:
       # 构建镜像
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.10.7
         
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -119,6 +122,9 @@ jobs:
             ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}-${{ matrix.arch }}
           labels: |
             arch=${{ matrix.arch }}
+          # 添加以下关键设置解决301问题
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
             
   create-manifest:
     runs-on: ubuntu-latest
@@ -142,17 +148,17 @@ jobs:
           REPO=${{ env.DOCKERHUB_REPO }}
           
           # 定义要处理的所有标签
-          TAGS=("$MAIN_TAG" "$SEC_TAG" "$COMMIT_TAG")
+          declare -a TAGS=("$MAIN_TAG" "$SEC_TAG" "$COMMIT_TAG")
           
           # 循环处理每个标签
           for TAG in "${TAGS[@]}"; do
             echo "处理标签: $REPO:$TAG"
             
-            # 创建amd64的manifest
+            # 创建多架构 manifest
             docker manifest create $REPO:$TAG \
               --amend $REPO:$TAG-amd64 \
               --amend $REPO:$TAG-arm64
-            
+              
             # 推送manifest到Docker Hub
             docker manifest push $REPO:$TAG
           done
