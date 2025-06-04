@@ -71,8 +71,8 @@ jobs:
           
           if [ "$BUILD_TYPE" = "pre-release" ]; then
             COMMIT_HASH=$(jq -r '.commit_hash' $CONFIG_FILE)
-            MAIN_TAG="edge"
-            COMMIT_TAG="dev-$DATE-${COMMIT_HASH:0:7}"
+            MAIN_TAG="latest"
+            COMMIT_TAG="${COMMIT_HASH:0:7}"
           else
             TAG_NAME=$(jq -r '.tag_name' $CONFIG_FILE)
             MAIN_TAG="latest"
