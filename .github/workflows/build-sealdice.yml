@@ -1,8 +1,11 @@
 name: Build and Push SealDice Docker Images
 
 on:
+  workflow_dispatch:
   repository_dispatch:
-    types: [build-sealdice]
+
+env:
+  DOCKERHUB_REPO: shiaworkshop/sealdice
 
 jobs:
   build-and-push:
@@ -89,5 +92,5 @@ jobs:
           build-args: |
             DOWNLOAD_URL=${{ env.DOWNLOAD_URL }}
           tags: |
-            shiaworkshop/sealdice:${{ env.MAIN_TAG }}
-            shiaworkshop/sealdice:${{ env.COMMIT_TAG }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.MAIN_TAG }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}
