@@ -1,0 +1,183 @@
+name: Sync SealDice Releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # 加载之前记录的信息
+      - name: 加载版本信息
+        id: load_info
+        run: |
+          # 预发布信息
+          if [ -f "pre_release.json" ]; then
+            echo "PREV_PRE_COMMIT=$(jq -r '.commit_hash' pre_release.json)" >> $GITHUB_ENV
+            echo "PREV_PRE_DATE=$(jq -r '.date' pre_release.json)" >> $GITHUB_ENV
+          else
+            echo "PREV_PRE_COMMIT=" >> $GITHUB_ENV
+            echo "PREV_PRE_DATE=" >> $GITHUB_ENV
+          fi
+          
+          # 正式发布信息
+          if [ -f "last_release.json" ]; then
+            echo "PREV_STABLE_TAG=$(jq -r '.tag_name' last_release.json)" >> $GITHUB_ENV
+            echo "PREV_STABLE_DATE=$(jq -r '.published_at' last_release.json)" >> $GITHUB_ENV
+          else
+            echo "PREV_STABLE_TAG=" >> $GITHUB_ENV
+            echo "PREV_STABLE_DATE=" >> $GITHUB_ENV
+          fi
+
+      # 检查预发布版本更新
+      - name: 检查预发布更新
+        id: check_pre_release
+        continue-on-error: true
+        run: |
+          # 获取预发布信息
+          RESPONSE=$(curl -s \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/sealdice/sealdice-build/releases/tags/pre-release")
+          
+          # 检查是否包含预发布
+          if [[ -z $(echo "$RESPONSE" | jq -r '.message? // ""') ]]; then
+            # 解析文件名获取版本信息
+            echo "$RESPONSE" | jq -r '.assets[].name' | grep '_linux_' > filenames.txt
+            
+            # 提取第一个匹配的文件作为样本
+            SAMPLE_FILE=$(grep -m 1 '_linux_' filenames.txt)
+            
+            # 解析日期和commit哈希
+            TIMESTAMP=$(echo "$SAMPLE_FILE" | grep -oE '2[0-9]{7}')
+            COMMIT_HASH=$(echo "$SAMPLE_FILE" | grep -oE '[a-f0-9]{7}' | head -1)
+            
+            # 收集所有平台的下载URL
+            LINUX_AMD64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url')
+            LINUX_ARM64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_arm64.tar.gz")) | .browser_download_url')
+            
+            # 创建预发布JSON
+            echo '{
+              "type": "pre-release",
+              "date": "'$TIMESTAMP'",
+              "commit_hash": "'$COMMIT_HASH'",
+              "downloads": {
+                "linux_amd64": "'$LINUX_AMD64_URL'",
+                "linux_arm64": "'$LINUX_ARM64_URL'"
+              }
+            }' > pre_release_temp.json
+            
+            # 检查是否需要更新
+            if [ -z "${{ env.PREV_PRE_COMMIT }}" ] || [ "${{ env.PREV_PRE_COMMIT }}" != "$COMMIT_HASH" ]; then
+              echo "发现新版预发布，commit哈希: $COMMIT_HASH"
+              echo "PRE_NEED_UPDATE=true" >> $GITHUB_ENV
+              mv pre_release_temp.json pre_release.json
+            else
+              echo "预发布版本未变化"
+              rm pre_release_temp.json
+            fi
+          else
+            echo "未找到预发布版本"
+          fi
+
+      # 检查正式版本更新
+      - name: 检查正式发布更新
+        id: check_stable_release
+        continue-on-error: true
+        run: |
+          # 获取最新正式发布
+          RESPONSE=$(curl -s \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/sealdice/sealdice-build/releases/latest?exclude_prereleases=true")
+          
+          # 检查是否有正式发布
+          if [[ -z $(echo "$RESPONSE" | jq -r '.message? // ""') ]]; then
+            TAG_NAME=$(echo "$RESPONSE" | jq -r '.tag_name')
+            PUBLISHED_AT=$(echo "$RESPONSE" | jq -r '.published_at')
+            
+            # 收集所有平台的下载URL
+            LINUX_AMD64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url')
+            LINUX_ARM64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_arm64.tar.gz")) | .browser_download_url')
+            
+            # 创建正式发布JSON
+            echo '{
+              "type": "stable",
+              "tag_name": "'$TAG_NAME'",
+              "published_at": "'$PUBLISHED_AT'",
+              "downloads": {
+                "linux_amd64": "'$LINUX_AMD64_URL'",
+                "linux_arm64": "'$LINUX_ARM64_URL'"
+              }
+            }' > last_release_temp.json
+            
+            # 检查是否需要更新
+            if [ -z "${{ env.PREV_STABLE_TAG }}" ] || [ "${{ env.PREV_STABLE_TAG }}" != "$TAG_NAME" ]; then
+              echo "发现新版正式发布，标签: $TAG_NAME"
+              echo "STABLE_NEED_UPDATE=true" >> $GITHUB_ENV
+              mv last_release_temp.json last_release.json
+            else
+              echo "正式版本未变化"
+              rm last_release_temp.json
+            fi
+          else
+            echo "未找到正式发布版本"
+          fi
+
+      # 更新记录并触发构建
+      - name: 处理更新
+        if: env.PRE_NEED_UPDATE == 'true' || env.STABLE_NEED_UPDATE == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 提交版本信息更新
+          git config user.name "github-actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          if [ "$PRE_NEED_UPDATE" = "true" ]; then
+            git add pre_release.json
+          fi
+          
+          if [ "$STABLE_NEED_UPDATE" = "true" ]; then
+            git add last_release.json
+          fi
+          
+          git commit -m "更新SealDice版本信息"
+          git push
+          
+          # 触发相应构建
+          if [ "$PRE_NEED_UPDATE" = "true" ]; then
+            PRE_JSON=$(cat pre_release.json)
+            curl -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+              -d '{
+                "event_type": "build-sealdice",
+                "client_payload": '"$PRE_JSON"'
+              }'
+            echo "已触发预发布构建"
+          fi
+          
+          if [ "$STABLE_NEED_UPDATE" = "true" ]; then
+            STABLE_JSON=$(cat last_release.json)
+            curl -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+              -d '{
+                "event_type": "build-sealdice",
+                "client_payload": '"$STABLE_JSON"'
+              }'
+            echo "已触发正式发布构建"
+          fi
