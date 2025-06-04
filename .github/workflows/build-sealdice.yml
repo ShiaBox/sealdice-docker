@@ -14,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史记录，用于检查文件变更
+          fetch-depth: 0 
           
       - name: 确定构建类型
         id: determine_type
@@ -70,7 +70,7 @@ jobs:
           echo "下载URL: $DOWNLOAD_URL"
           echo "架构: ${{ matrix.arch }}"
 
-      # 后续构建步骤保持不变...
+      # 构建镜像
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
         
