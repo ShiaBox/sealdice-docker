@@ -18,6 +18,10 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
+    outputs:
+      main_tag: ${{ steps.load_version.outputs.main_tag }}
+      sec_tag: ${{ steps.load_version.outputs.sec_tag }}
+      commit_tag: ${{ steps.load_version.outputs.commit_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,7 +87,13 @@ jobs:
           
           echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
           echo "MAIN_TAG=$MAIN_TAG" >> $GITHUB_ENV
+          echo "SEC_TAG=$SEC_TAG" >> $GITHUB_ENV
           echo "COMMIT_TAG=$COMMIT_TAG" >> $GITHUB_ENV
+          
+          # 输出标签信息
+          echo "main_tag=$MAIN_TAG" >> $GITHUB_OUTPUT
+          echo "sec_tag=$SEC_TAG" >> $GITHUB_OUTPUT
+          echo "commit_tag=$COMMIT_TAG" >> $GITHUB_OUTPUT
 
       # 构建镜像
       - name: Setup Docker Buildx
@@ -104,6 +114,45 @@ jobs:
           build-args: |
             DOWNLOAD_URL=${{ env.DOWNLOAD_URL }}
           tags: |
-            ${{ env.DOCKERHUB_REPO }}:${{ env.MAIN_TAG }}
-            ${{ env.DOCKERHUB_REPO }}:${{ env.SEC_TAG }}
-            ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.MAIN_TAG }}-${{ matrix.arch }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.SEC_TAG }}-${{ matrix.arch }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}-${{ matrix.arch }}
+          labels: |
+            arch=${{ matrix.arch }}
+            
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: 创建并推送 Manifest 清单
+        run: |
+          # 从需要的工作中获取标签值
+          MAIN_TAG=${{ needs.build-and-push.outputs.main_tag }}
+          SEC_TAG=${{ needs.build-and-push.outputs.sec_tag }}
+          COMMIT_TAG=${{ needs.build-and-push.outputs.commit_tag }}
+          REPO=${{ env.DOCKERHUB_REPO }}
+          
+          # 定义要处理的所有标签
+          TAGS=("$MAIN_TAG" "$SEC_TAG" "$COMMIT_TAG")
+          
+          # 循环处理每个标签
+          for TAG in "${TAGS[@]}"; do
+            echo "处理标签: $REPO:$TAG"
+            
+            # 创建amd64的manifest
+            docker manifest create $REPO:$TAG \
+              --amend $REPO:$TAG-amd64 \
+              --amend $REPO:$TAG-arm64
+            
+            # 推送manifest到Docker Hub
+            docker manifest push $REPO:$TAG
+          done
