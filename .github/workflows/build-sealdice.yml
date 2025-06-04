@@ -72,10 +72,12 @@ jobs:
           if [ "$BUILD_TYPE" = "pre-release" ]; then
             COMMIT_HASH=$(jq -r '.commit_hash' $CONFIG_FILE)
             MAIN_TAG="latest"
+            SEC_TAG="edge"
             COMMIT_TAG="${COMMIT_HASH:0:7}"
           else
             TAG_NAME=$(jq -r '.tag_name' $CONFIG_FILE)
             MAIN_TAG="latest"
+            SEC_TAG="stable"
             COMMIT_TAG="$TAG_NAME"
           fi
           
@@ -103,4 +105,5 @@ jobs:
             DOWNLOAD_URL=${{ env.DOWNLOAD_URL }}
           tags: |
             ${{ env.DOCKERHUB_REPO }}:${{ env.MAIN_TAG }}
+            ${{ env.DOCKERHUB_REPO }}:${{ env.SEC_TAG }}
             ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}
