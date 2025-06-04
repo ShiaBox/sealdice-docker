@@ -89,5 +89,5 @@ jobs:
           build-args: |
             DOWNLOAD_URL=${{ env.DOWNLOAD_URL }}
           tags: |
-            yourusername/sealdice:${{ env.MAIN_TAG }}
-            yourusername/sealdice:${{ env.COMMIT_TAG }}
+            shiaworkshop/sealdice:${{ env.MAIN_TAG }}
+            shiaworkshop/sealdice:${{ env.COMMIT_TAG }}
