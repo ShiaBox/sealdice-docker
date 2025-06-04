@@ -1,0 +1,9 @@
+{
+    "type": "stable",
+    "tag_name": "v1.4.6",
+    "published_at": "2024-08-09T15:41:13Z",
+    "downloads": {
+      "linux_amd64": "https://github.com/sealdice/sealdice-build/releases/download/v1.4.6/sealdice-core_1.4.6_linux_amd64.tar.gz",
+      "linux_arm64": "https://github.com/sealdice/sealdice-build/releases/download/v1.4.6/sealdice-core_1.4.6_linux_arm64.tar.gz"
+    }
+  }
