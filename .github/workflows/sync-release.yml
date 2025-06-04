@@ -136,7 +136,7 @@ jobs:
       - name: 更新记录并触发构建
         if: env.PRE_NEED_UPDATE == 'true' || env.STABLE_NEED_UPDATE == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           # 提交版本信息更新
           git config user.name "github-actions"
