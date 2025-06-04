@@ -2,6 +2,11 @@ name: Build and Push SealDice Docker Images
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type (pre-release/stable)'
+        required: false
+        default: 'auto'
   repository_dispatch:
 
 env:
@@ -16,62 +21,67 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 
-          
+        
       - name: 确定构建类型
         id: determine_type
         run: |
-          # 比较上次提交的改动
-          PRE_MODIFIED=$(git diff --name-only HEAD^ HEAD | grep pre_release.json || true)
-          STABLE_MODIFIED=$(git diff --name-only HEAD^ HEAD | grep last_release.json || true)
-          
-          if [ -n "$PRE_MODIFIED" ]; then
-            echo "RELEASE_TYPE=pre-release" >> $GITHUB_ENV
-            CONFIG_FILE="pre_release.json"
-          elif [ -n "$STABLE_MODIFIED" ]; then
-            echo "RELEASE_TYPE=stable" >> $GITHUB_ENV
-            CONFIG_FILE="last_release.json"
+          # 检查输入参数
+          if [ "${{ inputs.build_type }}" != "auto" ]; then
+            echo "使用传入的构建类型: ${{ inputs.build_type }}"
+            BUILD_TYPE="${{ inputs.build_type }}"
           else
-            echo "未检测到版本文件更新，退出"
-            exit 1
+            echo "没有指定构建类型，自动选择最新版本"
+            # 如果没有传递参数，自动选择最新稳定版，没有稳定版则用预发布
+            if [ -f "last_release.json" ]; then
+              BUILD_TYPE="stable"
+            elif [ -f "pre_release.json" ]; then
+              BUILD_TYPE="pre-release"
+            else
+              echo "错误：找不到任何版本信息文件"
+              exit 1
+            fi
           fi
           
-          echo "CONFIG_FILE=$CONFIG_FILE" >> $GITHUB_ENV
+          echo "最终构建类型: $BUILD_TYPE"
+          echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
       
-      - name: 读取版本信息
-        id: read_version
+      - name: 加载版本信息
+        id: load_version
         run: |
-          # 从JSON文件中读取数据
-          jq . ${{ env.CONFIG_FILE }} > config_details.json
-          cat config_details.json
+          case "$BUILD_TYPE" in
+            "pre-release")
+              CONFIG_FILE="pre_release.json"
+              ;;
+            "stable")
+              CONFIG_FILE="last_release.json"
+              ;;
+            *)
+              echo "不支持的构建类型: $BUILD_TYPE"
+              exit 1
+              ;;
+          esac
           
-          # 提取基本信息
-          if [ "${{ env.RELEASE_TYPE }}" = "pre-release" ]; then
-            DATE=$(jq -r '.date' ${{ env.CONFIG_FILE }})
-            COMMIT_HASH=$(jq -r '.commit_hash' ${{ env.CONFIG_FILE }})
-            COMMIT_TAG="dev-$DATE-$COMMIT_HASH"
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+          echo "CONFIG_FILE=$CONFIG_FILE" >> $GITHUB_ENV
+          
+          # 解析配置文件
+          DATE=$(jq -r '.date' $CONFIG_FILE)
+          DOWNLOAD_URL=$(jq -r '.downloads.linux_'${{ matrix.arch }} $CONFIG_FILE)
+          
+          if [ "$BUILD_TYPE" = "pre-release" ]; then
+            COMMIT_HASH=$(jq -r '.commit_hash' $CONFIG_FILE)
             MAIN_TAG="edge"
+            COMMIT_TAG="dev-$DATE-${COMMIT_HASH:0:7}"
           else
-            TAG_NAME=$(jq -r '.tag_name' ${{ env.CONFIG_FILE }})
-            COMMIT_TAG=$TAG_NAME
+            TAG_NAME=$(jq -r '.tag_name' $CONFIG_FILE)
             MAIN_TAG="latest"
+            COMMIT_TAG="$TAG_NAME"
           fi
           
-          # 根据当前架构选择下载URL
-          DOWNLOAD_URL=$(jq -r '.downloads.linux_'${{ matrix.arch }} ${{ env.CONFIG_FILE }})
-          
+          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
           echo "MAIN_TAG=$MAIN_TAG" >> $GITHUB_ENV
           echo "COMMIT_TAG=$COMMIT_TAG" >> $GITHUB_ENV
-          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
-          
-          # 打印验证信息
-          echo "构建参数:"
-          echo "类型: ${{ env.RELEASE_TYPE }}"
-          echo "主标签: $MAIN_TAG"
-          echo "提交标签: $COMMIT_TAG"
-          echo "下载URL: $DOWNLOAD_URL"
-          echo "架构: ${{ matrix.arch }}"
 
       # 构建镜像
       - name: Setup Docker Buildx
