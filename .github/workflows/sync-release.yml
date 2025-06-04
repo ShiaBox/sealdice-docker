@@ -133,7 +133,7 @@ jobs:
           fi
 
       # 更新记录并触发构建
-      - name: 处理更新
+      - name: 更新记录并触发构建
         if: env.PRE_NEED_UPDATE == 'true' || env.STABLE_NEED_UPDATE == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -153,31 +153,12 @@ jobs:
           git commit -m "更新SealDice版本信息"
           git push
           
-          # 触发相应构建
-          if [ "$PRE_NEED_UPDATE" = "true" ]; then
-            PRE_JSON=$(cat pre_release.json)
-            curl -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/repos/${{ github.repository }}/dispatches" \
-              -d '{
-                "event_type": "build-sealdice",
-                "client_payload": '"$PRE_JSON"'
-              }'
-            echo "已触发预发布构建"
-          fi
-          
-          if [ "$STABLE_NEED_UPDATE" = "true" ]; then
-            STABLE_JSON=$(cat last_release.json)
-            curl -X POST \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Content-Type: application/json" \
-              "https://api.github.com/repos/${{ github.repository }}/dispatches" \
-              -d '{
-                "event_type": "build-sealdice",
-                "client_payload": '"$STABLE_JSON"'
-              }'
-            echo "已触发正式发布构建"
-          fi
+          # 只触发构建工作流，不传递参数
+          curl -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+            -d '{
+              "event_type": "build-sealdice"
+            }'
