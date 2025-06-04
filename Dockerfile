@@ -1,3 +1,4 @@
+# 使用 Ubuntu 24.04 基础镜像
 FROM ubuntu:24.04
 
 # 设置时区
@@ -14,16 +15,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # 创建目录结构
-RUN mkdir -p /release-backup /sealdice/data /sealdice/backup
+RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
 
 # 声明卷
 VOLUME ["/sealdice/data", "/sealdice/backup"]
 
-# 下载应用文件到备份目录
-RUN wget -q https://github.com/sealdice/sealdice-build/releases/download/pre-release/sealdice_20250603-10aa805_linux_amd64.tar.gz -O /tmp/sealdice.tar.gz && \
+# 从环境变量获取下载URL（由构建参数传入）
+ARG DOWNLOAD_URL
+RUN wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz && \
     tar -xzf /tmp/sealdice.tar.gz -C /release-backup --strip-components=1 && \
     rm /tmp/sealdice.tar.gz && \
-    chmod -R 755 /release-backup/*  
+    chmod -R 755 /release-backup/*
 
 # 生成入口脚本
 RUN echo "#!/bin/sh" > /entrypoint.sh && \
