@@ -55,11 +55,11 @@ jobs:
             echo "$RESPONSE" | jq -r '.assets[].name' | grep '_linux_' > filenames.txt
             
             # 提取第一个匹配的文件作为样本
-            SAMPLE_FILE=$(grep -m 1 '_linux_' filenames.txt)
+            SAMPLE_FILE=$(grep -m 1 'linux_amd64' filenames.txt)
             
             # 解析日期和commit哈希
             TIMESTAMP=$(echo "$SAMPLE_FILE" | grep -oE '2[0-9]{7}')
-            COMMIT_HASH=$(echo "$SAMPLE_FILE" | grep -oE '[a-f0-9]{7}' | head -1)
+            COMMIT_HASH=$(echo "$SAMPLE_FILE" | awk -F'_linux_' '{print $1}' | rev | cut -c1-7 | rev)
             
             # 收集所有平台的下载URL
             LINUX_AMD64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url')
