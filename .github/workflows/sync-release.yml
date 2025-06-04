@@ -150,7 +150,7 @@ jobs:
           fi
           
           git commit -m "更新SealDice版本信息"
-          git push "https://${{ github.actor }}:$GITHUB_TOKEN@github.com/${{ github.repository }}.git"
+          git push "https://${{ github.actor }}:$GH_PAT@github.com/${{ github.repository }}.git"
           
           # 触发构建工作流
           curl -X POST \
