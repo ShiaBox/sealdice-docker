@@ -53,7 +53,7 @@ RUN set -eux; \
     \
     # 下载并解压
     wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz; \
-    tar -xzf /tmp/sealdice.tar.gz -C /release-backup --strip-components=1; \
+    tar -xzf /tmp/sealdice.tar.gz -C /release-backup ; \
     rm /tmp/sealdice.tar.gz; \
     chmod -R 755 /release-backup/*
 
