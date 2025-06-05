@@ -39,7 +39,13 @@ jobs:
           fi
           echo "最终构建类型: $BUILD_TYPE"
           echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
-          echo "CONFIG_FILE=${BUILD_TYPE}_release.json" >> $GITHUB_ENV
+          echo "CONFIG_FILE=$CONFIG_FILE" >> $GITHUB_ENV
+          
+          if [ "$BUILD_TYPE" = "pre-release" ]; then
+            CONFIG_FILE="pre_release.json"
+          else
+            CONFIG_FILE="last_release.json"  # 您的稳定版配置文件实际名称
+          fi
       
       - name: 获取版本标签
         id: get_version
