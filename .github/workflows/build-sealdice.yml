@@ -25,11 +25,17 @@ jobs:
       - name: 确定构建类型
         id: determine_type
         run: |
-          # 设置默认值
-          INPUT_TYPE="${INPUT_BUILD_TYPE:-stable}"
+          # 正确获取 workflow_dispatch 输入参数
+          if [ -n "${{ github.event.inputs.build_type }}" ]; then
+            INPUT_TYPE="${{ github.event.inputs.build_type }}"
+          else
+            INPUT_TYPE="stable"  # 默认值
+          fi
+          
+          echo "接收到的输入类型: $INPUT_TYPE"
           
           # 处理输入参数
-          if [ -n "$INPUT_TYPE" ] && [ "$INPUT_TYPE" != "auto" ]; then
+          if [ "$INPUT_TYPE" != "auto" ]; then
             BUILD_TYPE="$INPUT_TYPE"
             echo "使用传入的构建类型: $BUILD_TYPE"
           else
