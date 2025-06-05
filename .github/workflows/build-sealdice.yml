@@ -25,35 +25,33 @@ jobs:
       - name: 确定构建类型
         id: determine_type
         run: |
-          # 检查输入参数
-          if [ "${{ inputs.build_type }}" != "auto" ]; then
-            echo "使用传入的构建类型: ${{ inputs.build_type }}"
-            BUILD_TYPE="${{ inputs.build_type }}"
+          if [ "${{ github.event.inputs.build_type || 'stable' }}" != "auto" ]; then
+            BUILD_TYPE="${{ github.event.inputs.build_type || 'stable' }}"
           else
-            echo "没有指定构建类型，自动选择最新版本"
-            # 如果没有传递参数，自动选择最新稳定版，没有稳定版则用预发布
             if [ -f "last_release.json" ]; then
               BUILD_TYPE="stable"
             elif [ -f "pre_release.json" ]; then
               BUILD_TYPE="pre-release"
             else
-              echo "错误：找不到任何版本信息文件"
+              echo "找不到版本信息文件"
               exit 1
             fi
           fi
-          
           echo "最终构建类型: $BUILD_TYPE"
           echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
+          echo "CONFIG_FILE=${BUILD_TYPE}_release.json" >> $GITHUB_ENV
       
-      - name: 加载版本信息
-        id: load_version
+      - name: 获取版本标签
+        id: get_version
         run: |
           case "$BUILD_TYPE" in
             "pre-release")
-              CONFIG_FILE="pre_release.json"
+              # 从JSON文件获取提交哈希的前7位
+              COMMIT_TAG=$(jq -r '.commit_hash[0:7]' $CONFIG_FILE)
               ;;
             "stable")
-              CONFIG_FILE="last_release.json"
+              # 从JSON文件获取完整版本号
+              COMMIT_TAG=$(jq -r '.tag_name' $CONFIG_FILE)
               ;;
             *)
               echo "不支持的构建类型: $BUILD_TYPE"
@@ -61,29 +59,9 @@ jobs:
               ;;
           esac
           
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
-          echo "CONFIG_FILE=$CONFIG_FILE" >> $GITHUB_ENV
-          
-          # 解析配置文件
-          DATE=$(jq -r '.date' $CONFIG_FILE)
-          DOWNLOAD_URL=$(jq -r '.downloads.linux_'${{ matrix.arch }} $CONFIG_FILE)
-          
-          if [ "$BUILD_TYPE" = "pre-release" ]; then
-            COMMIT_HASH=$(jq -r '.commit_hash' $CONFIG_FILE)
-            MAIN_TAG="pre"
-            COMMIT_TAG="${COMMIT_HASH:0:7}"
-          else
-            TAG_NAME=$(jq -r '.tag_name' $CONFIG_FILE)
-            MAIN_TAG="stable"
-            COMMIT_TAG="$TAG_NAME"
-          fi
-          
-          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> $GITHUB_ENV
-          echo "MAIN_TAG=$MAIN_TAG" >> $GITHUB_ENV
           echo "COMMIT_TAG=$COMMIT_TAG" >> $GITHUB_ENV
+          echo "MAIN_TAG=$BUILD_TYPE" >> $GITHUB_ENV
 
-      # 构建镜像
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -100,7 +78,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            DOWNLOAD_URL=${{ env.DOWNLOAD_URL }}
+            BUILD_TYPE=${{ env.BUILD_TYPE }}
+            CONFIG_FILE=${{ env.CONFIG_FILE }}
           tags: |
             ${{ env.DOCKERHUB_REPO }}:${{ env.MAIN_TAG }}
             ${{ env.DOCKERHUB_REPO }}:${{ env.COMMIT_TAG }}
