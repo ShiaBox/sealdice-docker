@@ -21,17 +21,40 @@ RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
 # 声明卷
 VOLUME ["/sealdice/data", "/sealdice/backup"]
 
-# 根据构建平台自动选择下载URL
+# 添加配置文件
 ARG CONFIG_FILE
-ARG BUILD_TYPE
 COPY $CONFIG_FILE /config.json
-RUN if [ "$BUILD_TYPE" = "stable" ]; then TAG=$(jq -r '.tag_name' /config.json); else TAG=$(jq -r '.commit_hash' /config.json | head -c 7); fi && \
-    ARCH=$TARGETARCH && \
-    [ "$ARCH" = "arm64" ] && ARCH=arm64 || ARCH=amd64 && \
-    DOWNLOAD_URL=$(jq -r ".downloads.linux_${ARCH}" /config.json) && \
-    wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz && \
-    tar -xzf /tmp/sealdice.tar.gz -C /release-backup --strip-components=1 && \
-    rm /tmp/sealdice.tar.gz /config.json && \
+
+# 根据构建类型和架构选择下载链接
+ARG BUILD_TYPE
+ARG TARGETARCH
+
+RUN set -eux; \
+    # 确定架构
+    case "$TARGETARCH" in \
+        amd64) ARCH="amd64" ;; \
+        arm64) ARCH="arm64" ;; \
+        *) ARCH="amd64" ;; \
+    esac; \
+    \
+    # 调试信息
+    echo "构建类型: $BUILD_TYPE"; \
+    echo "架构: $ARCH"; \
+    \
+    # 获取下载URL
+    DOWNLOAD_URL=$(jq -r ".downloads.linux_$ARCH" /config.json); \
+    \
+    # 如果找不到小写格式，尝试首字母大写
+    if [ "$DOWNLOAD_URL" = "null" ]; then \
+        DOWNLOAD_URL=$(jq -r ".downloads.Linux_$ARCH" /config.json); \
+    fi; \
+    \
+    echo "下载URL: $DOWNLOAD_URL"; \
+    \
+    # 下载并解压
+    wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz; \
+    tar -xzf /tmp/sealdice.tar.gz -C /release-backup --strip-components=1; \
+    rm /tmp/sealdice.tar.gz; \
     chmod -R 755 /release-backup/*
 
 # 生成入口脚本
