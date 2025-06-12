@@ -1,9 +1,9 @@
 {
     "type": "pre-release",
-    "date": "20250611",
-    "commit_hash": "e183ef7",
+    "date": "20250612",
+    "commit_hash": "3fe49b0",
     "downloads": {
-      "linux_amd64": "https://github.com/sealdice/sealdice-build/releases/download/pre-release/sealdice_20250611-e183ef7_linux_amd64.tar.gz",
-      "linux_arm64": "https://github.com/sealdice/sealdice-build/releases/download/pre-release/sealdice_20250611-e183ef7_linux_arm64.tar.gz"
+      "linux_amd64": "https://github.com/sealdice/sealdice-build/releases/download/pre-release/sealdice_20250612-3fe49b0_linux_amd64.tar.gz",
+      "linux_arm64": "https://github.com/sealdice/sealdice-build/releases/download/pre-release/sealdice_20250612-3fe49b0_linux_arm64.tar.gz"
     }
   }
