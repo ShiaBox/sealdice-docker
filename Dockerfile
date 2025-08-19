@@ -1,19 +1,14 @@
-# 使用 Ubuntu 24.04 基础镜像
-FROM ubuntu:24.04
+FROM debian:12-slim
 
 # 设置时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata \
-    libicu74 \
-    ca-certificates \
-    wget \
-    tar \
-    jq \
- && rm -rf /var/lib/apt/lists/*
+# 安装最小化依赖项
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libicu72 ca-certificates wget tar && \
+    rm -rf /var/lib/apt/lists/*
 
 # 创建目录结构
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
@@ -37,16 +32,9 @@ RUN set -eux; \
         *) ARCH="amd64" ;; \
     esac; \
     \
-    # 调试信息
-    echo "构建类型: $BUILD_TYPE"; \
-    echo "架构: $ARCH"; \
-    \
-    # 获取下载URL
-    DOWNLOAD_URL=$(jq -r ".downloads.linux_$ARCH" /config.json); \
-    \
-    # 如果找不到小写格式，尝试首字母大写
-    if [ "$DOWNLOAD_URL" = "null" ]; then \
-        DOWNLOAD_URL=$(jq -r ".downloads.Linux_$ARCH" /config.json); \
+    DOWNLOAD_URL=$(sed -n "s/.*\"linux_$ARCH\": *\"\\([^\"]*\\)\".*/\\1/p" /config.json); \
+    if [ -z "$DOWNLOAD_URL" ]; then \
+        DOWNLOAD_URL=$(sed -n "s/.*\"Linux_$ARCH\": *\"\\([^\"]*\\)\".*/\\1/p" /config.json); \
     fi; \
     \
     echo "下载URL: $DOWNLOAD_URL"; \
