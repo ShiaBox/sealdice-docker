@@ -11,7 +11,9 @@ RUN apk add --no-cache tzdata && \
 RUN apk add --no-cache \
     gcompat \
     libstdc++ \
-    libgcc
+    libgcc \
+    icu-data-full \
+    icu-libs
 
 # 创建目录结构
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
