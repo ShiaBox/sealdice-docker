@@ -8,7 +8,7 @@ RUN apk add --no-cache tzdata && \
     apk del tzdata
 
 # 安装运行依赖
-RUN apk add --no-cache libc6-compat icu-data-full
+RUN apk add --no-cache gcompat libstdc++
 
 # 创建目录结构
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
