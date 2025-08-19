@@ -1,19 +1,19 @@
-# 使用 Alpine Linux 基础镜像
-FROM alpine:3.19
+# 使用 Ubuntu 24.04 基础镜像
+FROM ubuntu:24.04
 
 # 设置时区
-RUN apk add --no-cache tzdata && \
-    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
-    echo "Asia/Shanghai" > /etc/timezone && \
-    apk del tzdata
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装运行依赖
-RUN apk add --no-cache \
-    gcompat \
-    libstdc++ \
-    libgcc \
-    icu-data-full \
-    icu-libs
+# 安装依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
+    libicu74 \
+    ca-certificates \
+    wget \
+    tar \
+    jq \
+ && rm -rf /var/lib/apt/lists/*
 
 # 创建目录结构
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
@@ -37,8 +37,9 @@ RUN set -eux; \
         *) ARCH="amd64" ;; \
     esac; \
     \
-    # 安装临时工具
-    apk add --no-cache --virtual .temp-tools curl jq; \
+    # 调试信息
+    echo "构建类型: $BUILD_TYPE"; \
+    echo "架构: $ARCH"; \
     \
     # 获取下载URL
     DOWNLOAD_URL=$(jq -r ".downloads.linux_$ARCH" /config.json); \
@@ -51,19 +52,16 @@ RUN set -eux; \
     echo "下载URL: $DOWNLOAD_URL"; \
     \
     # 下载并解压
-    curl -sS -L "$DOWNLOAD_URL" -o /tmp/sealdice.tar.gz; \
+    wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz; \
     tar -xzf /tmp/sealdice.tar.gz -C /release-backup ; \
     rm /tmp/sealdice.tar.gz; \
-    chmod -R 755 /release-backup/*; \
-    \
-    # 删除临时工具
-    apk del .temp-tools
+    chmod -R 755 /release-backup/*
 
 # 生成入口脚本
 RUN echo "#!/bin/sh" > /entrypoint.sh && \
     echo "cp -r /release-backup/* /sealdice/" >> /entrypoint.sh && \
     echo "cd /sealdice" >> /entrypoint.sh && \
-    echo "exec ./sealdice-core" >> /entrypoint.sh && \
+    echo "./sealdice-core" >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
 # 暴露端口并启动
