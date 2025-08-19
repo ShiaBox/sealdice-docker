@@ -1,14 +1,14 @@
-FROM debian:12-slim
+# 使用 Alpine Linux 基础镜像
+FROM alpine:3.19
 
 # 设置时区
-ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    apk del tzdata
 
-# 安装最小化依赖项
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libicu72 ca-certificates wget tar && \
-    rm -rf /var/lib/apt/lists/*
+# 安装运行依赖
+RUN apk add --no-cache libc6-compat icu-data-full
 
 # 创建目录结构
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
@@ -32,24 +32,33 @@ RUN set -eux; \
         *) ARCH="amd64" ;; \
     esac; \
     \
-    DOWNLOAD_URL=$(sed -n "s/.*\"linux_$ARCH\": *\"\\([^\"]*\\)\".*/\\1/p" /config.json); \
-    if [ -z "$DOWNLOAD_URL" ]; then \
-        DOWNLOAD_URL=$(sed -n "s/.*\"Linux_$ARCH\": *\"\\([^\"]*\\)\".*/\\1/p" /config.json); \
+    # 安装临时工具
+    apk add --no-cache --virtual .temp-tools curl jq; \
+    \
+    # 获取下载URL
+    DOWNLOAD_URL=$(jq -r ".downloads.linux_$ARCH" /config.json); \
+    \
+    # 如果找不到小写格式，尝试首字母大写
+    if [ "$DOWNLOAD_URL" = "null" ]; then \
+        DOWNLOAD_URL=$(jq -r ".downloads.Linux_$ARCH" /config.json); \
     fi; \
     \
     echo "下载URL: $DOWNLOAD_URL"; \
     \
     # 下载并解压
-    wget -q "$DOWNLOAD_URL" -O /tmp/sealdice.tar.gz; \
+    curl -sS -L "$DOWNLOAD_URL" -o /tmp/sealdice.tar.gz; \
     tar -xzf /tmp/sealdice.tar.gz -C /release-backup ; \
     rm /tmp/sealdice.tar.gz; \
-    chmod -R 755 /release-backup/*
+    chmod -R 755 /release-backup/*; \
+    \
+    # 删除临时工具
+    apk del .temp-tools
 
 # 生成入口脚本
 RUN echo "#!/bin/sh" > /entrypoint.sh && \
     echo "cp -r /release-backup/* /sealdice/" >> /entrypoint.sh && \
     echo "cd /sealdice" >> /entrypoint.sh && \
-    echo "./sealdice-core" >> /entrypoint.sh && \
+    echo "exec ./sealdice-core" >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
 # 暴露端口并启动
