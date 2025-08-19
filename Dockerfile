@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN mkdir -p /sealdice /release-backup /sealdice/data /sealdice/backup
 
 # 声明卷
-VOLUME ["/sealdice/data", "/sealdice/backup"]
+VOLUME ["/sealdice"]
 
 # 添加配置文件
 ARG CONFIG_FILE
