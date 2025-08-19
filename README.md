@@ -1,7 +1,7 @@
 # sealdice-docker
 海豹骰非官方Docker镜像，补全运行库，允许使用内置Lagrange登录.
 
-[Docker Hub](https://hub.docker.com/repository/docker/shiaworkshop/sealdice/general)
+[Docker Hub](https://hub.docker.com/r/shiaworkshop/sealdice)
 
 镜像会自动根据上游发布而构建，支持amd64/arm64
 
