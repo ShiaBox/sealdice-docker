@@ -44,11 +44,11 @@ jobs:
         id: check_pre_release
         continue-on-error: true
         run: |
-          # 获取所有发布信息，筛选出最新的预发布版本
+          # 获取所有发布信息，筛选出最新的、且文件名不含版本号的预发布版本
           RESPONSE=$(curl -s \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/sealdice/sealdice-build/releases" | \
-            jq '[.[] | select(.prerelease == true)] | sort_by(.published_at) | last')
+            jq '[.[] | select(.prerelease == true and (.assets[].name | contains("v1.") | not))] | sort_by(.published_at) | last')
           
           # 检查是否找到预发布版本
           if [ "$(echo "$RESPONSE" | jq -r 'if . == null then "null" else "found" end')" == "found" ]; then
@@ -101,7 +101,7 @@ jobs:
             "https://api.github.com/repos/sealdice/sealdice-build/releases")
           
           # 筛选tag_name以v开头的正式版，并获取最新的tag
-          LATEST_V_TAG=$(echo "$RESPONSE" | jq -r '[.[] | select((.tag_name | test("^v")) and .prerelease == false)] | sort_by(.published_at) | last.tag_name')
+          LATEST_V_TAG=$(echo "$RESPONSE" | jq -r '[.[] | select((.tag_name | test("^v")) and .prerelease == false)] | .[].tag_name' | tr -d 'v' | sort -V | tail -n 1 | sed 's/^/v/')
           
           if [ -n "$LATEST_V_TAG" ] && [ "$LATEST_V_TAG" != "null" ]; then
             # 查询该tag的详细信息
@@ -128,7 +128,7 @@ jobs:
             }' > last_release_temp.json
             
             # 检查是否需要更新
-            if [ -z "${{ env.PREV_STABLE_TAG }}" ] || [ "${{ env.PREV_STABLE_TAG }}" != "$TAG_NAME" ]; then
+            if [ -z "${{ env.PREV_STABLE_TAG }}" ] || [ "$(printf '%s\n' "${{ env.PREV_STABLE_TAG }}" "$TAG_NAME" | sort -V | head -n 1)" != "$TAG_NAME" ]; then
               echo "发现新版正式发布，标签: $TAG_NAME"
               echo "STABLE_NEED_UPDATE=true" >> $GITHUB_ENV
               mv last_release_temp.json last_release.json
