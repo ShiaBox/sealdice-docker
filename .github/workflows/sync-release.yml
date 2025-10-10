@@ -44,13 +44,14 @@ jobs:
         id: check_pre_release
         continue-on-error: true
         run: |
-          # 获取预发布信息
+          # 获取所有发布信息，筛选出最新的预发布版本
           RESPONSE=$(curl -s \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/sealdice/sealdice-build/releases/tags/pre-release")
+            "https://api.github.com/repos/sealdice/sealdice-build/releases" | \
+            jq '[.[] | select(.prerelease == true)] | sort_by(.published_at) | last')
           
-          # 检查是否包含预发布
-          if [[ -z $(echo "$RESPONSE" | jq -r '.message? // ""') ]]; then
+          # 检查是否找到预发布版本
+          if [ "$(echo "$RESPONSE" | jq -r 'if . == null then "null" else "found" end')" == "found" ]; then
             # 解析文件名获取版本信息
             echo "$RESPONSE" | jq -r '.assets[].name' | grep '_linux_' > filenames.txt
             
@@ -94,19 +95,26 @@ jobs:
         id: check_stable_release
         continue-on-error: true
         run: |
-          # 获取最新正式发布
+          # 获取所有发布信息
           RESPONSE=$(curl -s \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/sealdice/sealdice-build/releases/latest?exclude_prereleases=true")
+            "https://api.github.com/repos/sealdice/sealdice-build/releases")
           
-          # 检查是否有正式发布
-          if [[ -z $(echo "$RESPONSE" | jq -r '.message? // ""') ]]; then
-            TAG_NAME=$(echo "$RESPONSE" | jq -r '.tag_name')
-            PUBLISHED_AT=$(echo "$RESPONSE" | jq -r '.published_at')
+          # 筛选tag_name以v开头的正式版，并获取最新的tag
+          LATEST_V_TAG=$(echo "$RESPONSE" | jq -r '[.[] | select((.tag_name | test("^v")) and .prerelease == false)] | sort_by(.published_at) | last.tag_name')
+          
+          if [ -n "$LATEST_V_TAG" ] && [ "$LATEST_V_TAG" != "null" ]; then
+            # 查询该tag的详细信息
+            TAG_RESPONSE=$(curl -s \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/sealdice/sealdice-build/releases/tags/$LATEST_V_TAG")
+            
+            TAG_NAME=$(echo "$TAG_RESPONSE" | jq -r '.tag_name')
+            PUBLISHED_AT=$(echo "$TAG_RESPONSE" | jq -r '.published_at')
             
             # 收集所有平台的下载URL
-            LINUX_AMD64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url')
-            LINUX_ARM64_URL=$(echo "$RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_arm64.tar.gz")) | .browser_download_url')
+            LINUX_AMD64_URL=$(echo "$TAG_RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url')
+            LINUX_ARM64_URL=$(echo "$TAG_RESPONSE" | jq -r '.assets[] | select(.name | contains("linux_arm64.tar.gz")) | .browser_download_url')
             
             # 创建正式发布JSON
             echo '{
@@ -129,7 +137,7 @@ jobs:
               rm last_release_temp.json
             fi
           else
-            echo "未找到正式发布版本"
+            echo "未找到以v开头的正式发布版本"
           fi
 
       - name: 更新记录并触发构建
