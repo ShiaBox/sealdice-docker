@@ -159,18 +159,29 @@ jobs:
           
           # 触发构建工作流并传递类型参数
           if [ "$PRE_NEED_UPDATE" = "true" ]; then
-            BUILD_TYPE="pre-release"
-          elif [ "$STABLE_NEED_UPDATE" = "true" ]; then
-            BUILD_TYPE="stable"
+            echo "触发预发布版本构建"
+            curl -X POST \
+              -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-sealdice.yml/dispatches" \
+              -d '{
+                "ref": "main",
+                "inputs": {
+                  "build_type": "pre-release"
+                }
+              }'
           fi
           
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-sealdice.yml/dispatches" \
-            -d '{
-              "ref": "main",
-              "inputs": {
-                "build_type": "'$BUILD_TYPE'"
-              }
-            }'
+          if [ "$STABLE_NEED_UPDATE" = "true" ]; then
+            echo "触发正式版本构建"
+            curl -X POST \
+              -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-sealdice.yml/dispatches" \
+              -d '{
+                "ref": "main",
+                "inputs": {
+                  "build_type": "stable"
+                }
+              }'
+          fi
