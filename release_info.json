@@ -1,4 +1,0 @@
-{
-  "pre": $([ "$PRE_NEED_UPDATE" = "true" ] && cat pre_release.json || echo null),
-  "stable": $([ "$STABLE_NEED_UPDATE" = "true" ] && cat last_release.json || echo null)
-}
